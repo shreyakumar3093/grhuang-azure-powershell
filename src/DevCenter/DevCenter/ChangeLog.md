@@ -18,6 +18,7 @@
         - Additional information about change #1
 -->
 ## Upcoming Release
+* Updated control plane and data plane APIs to v2023-10-01-preview.
 
 ## Version 1.0.0
 * General availability for module Az.DevCenter
