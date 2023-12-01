@@ -26,6 +26,7 @@ using Azure.Containers.ContainerRegistry;
 using Microsoft.Azure.Commands.Common.Strategies;
 using Microsoft.Azure.Commands.ContainerRegistry.Track2Models;
 using Azure;
+using Azure.Core.Serialization;
 
 namespace Microsoft.Azure.Commands.ContainerRegistry
 {
@@ -168,9 +169,24 @@ namespace Microsoft.Azure.Commands.ContainerRegistry
             return GetRepository(repository);
         }
 
-        public PSAcrManifest ListManifest(string repository)
+        public PSAcrManifest ListManifest(string repositoryName)
         {
-            return new ContainerRegistryManifestListOperation(this, repository).ProcessRequest();
+            ContainerRepository repository = _track2Client.GetRepository(repositoryName);
+            Pageable<ArtifactManifestProperties> properties = repository.GetAllManifestProperties();
+            PSAcrManifest result = new PSAcrManifest();
+            result.ManifestsAttributes = new List<PSManifestAttributeBase>();
+            foreach (ArtifactManifestProperties property in properties)
+            {
+                result.ImageName = property.RepositoryName;
+                result.Registry = property.RegistryLoginServer;
+                RegistryArtifact artifact = _track2Client.GetArtifact(repositoryName, property.Digest);
+                Response<ArtifactManifestProperties> response = artifact.GetManifestProperties();
+                Response httpResponse = response.GetRawResponse();
+                dynamic artifactInfo = httpResponse.Content.ToDynamicFromJson(JsonPropertyNames.CamelCase);
+                result.ManifestsAttributes.Add(new PSManifestAttributeBase(property.Digest, property.SizeInBytes, property.CreatedOn.ToString(), property.LastUpdatedOn.ToString(), property.Architecture.ToString(), property.OperatingSystem.ToString(),
+                   artifactInfo.Manifest.MediaType, artifactInfo.Manifest.ConfigMediaType, new List<string>(property.Tags), new PSChangeableAttribute(property.CanDelete, property.CanWrite, property.CanList, property.CanRead)));
+            }
+            return result;
         }
 
         public PSManifestAttribute GetManifest(string repository, string manifest)
